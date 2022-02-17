@@ -84,7 +84,7 @@ def generate_shares(n, t, secret, p, q, r, g, idxs):
         # check1 = g ** shares[i-1][1] % p
         # check1 = g ** share_ith(shares, i) % p
         check1 = quick_pow(g, share_ith(shares, i), p)
-        check2 = verification(g, commitments, i, p)
+        check2 = verification(g, commitments, int(i), p)
         verifications.append(check2)
         if check1 == check2:
             pass
@@ -115,13 +115,13 @@ def f(x, coefficients, q):
 def commitment(coefficients, g, p):
     commitments = []
     for coefficient_index, coefficient_value in enumerate(coefficients[::-1]):
-        c = g ** coefficient_value % p
-        # c = quick_pow(g,coefficient_value,p)
+        # c = g ** coefficient_value % p
+        c = quick_pow(g,coefficient_value,p)
         commitments.append(c)
     return commitments
 
 
-def verification(g, commitments, i, p):
+def verification(commitments, i, p):
     v = 1
     for k, c in enumerate(commitments):
         v = v * (c) ** (i ** k) % p

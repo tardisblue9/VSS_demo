@@ -66,6 +66,13 @@ def initial(Z_lower=100):
 
 
 def generate_shares(N, T, K, secrets, p, q, r, g, alphas, betas):
+    secrets_check = []
+    for secret in secrets:
+        if secret==0: 
+            secrets_check.append(1) # one exception after quantization
+        else:
+            secrets_check.append(secret)
+    secrets = secrets_check
     for secret in secrets:
         assert secret >= 1 and secret <= q, "secret not in range"
 
@@ -78,21 +85,57 @@ def generate_shares(N, T, K, secrets, p, q, r, g, alphas, betas):
         y = _lagrange_interpolate(alpha, betas, secrets + noises, q)
         shares.append((alpha, y))
 
-#     commitments = commitment(coefficients, g, p)
-#     verifications = []
-#     for i in users:
-#         # check1 = g ** shares[i-1][1] % p
-#         # check1 = g ** share_ith(shares, i) % p
-#         check1 = quick_pow(g, share_ith(shares, i), p)
-#         check2 = verification(g, commitments, i, p)
-#         verifications.append(check2)
-#         if check1 == check2:
-#             pass
-#         else:
-#             print("checking fails with:", check1, check2)
+    commitments = commitment(secrets + noises, g, p)
+    # print("commitments",commitments)
+    verifications = []
+    for alpha in alphas:
+        # check1 = g ** shares[i-1][1] % p
+        # check1 = g ** share_ith(shares, i) % p
+        check1 = quick_pow(g, share_ith(shares, alpha), p)
+        check2 = verification(commitments, alpha, betas, p)
+        verifications.append(check2)
+        if check1 == check2:
+            pass
+        else:
+            print("checking fails with:", check1, check2)
+    # print("verifications",verifications)
+    return shares, commitments, verifications
 
-#     return shares, commitments, verifications
-    return shares,None,None
+def share_ith(shares, i):
+    for share in shares:
+        if share[0] == i:
+            return share[1]
+    return None
+
+def quick_pow(a, b, q):  # compute a^b mod q, in a faster way
+    temp = 1
+    for i in range(1, b + 1):
+        temp = temp * a % q
+    return temp % q
+
+def commitment(paras, g, p):
+    commitments = []
+    for para in paras:
+        # c = g ** coefficient_value % p
+        c = quick_pow(g,para,p)
+        commitments.append(c)
+    return commitments
+
+def verification(commitments, alpha, betas, p):
+    v_pos, v_neg = 1,1
+    for i, c in enumerate(commitments):
+        num, den = 1, 1
+        for k, _ in enumerate(commitments):
+            if k != i:
+                num *= alpha - betas[k]
+                den *= betas[i] - betas[k]
+            else:pass
+        if num/den > 0 :
+            v_pos = v_pos * c ** int(num/den) % p
+        else:
+            v_neg = v_neg  * c ** int(-num/den) % p
+    v = _divmod(v_pos, v_neg, p)
+    return v % p
 
 
 def f(x, secrets, zs, betas, q):
@@ -200,11 +243,11 @@ if __name__ == '__main__':
     # initialization
     time_start = time.time()
     print("========Main LCC Starts==========")
-    p,q,r,g = initial(10**5)
+    p,q,r,g = initial(10**4)
 
     # Secret taken from the group Z_q* 
-    T, N, K = 3, 15, 3
-    secrets = [422,378,1101]
+    T, N, K = 2, 10, 3
+    secrets = [0,378,787]
     print(f'Original Secret: {secrets}')
 
     # Phase I: Generation of shares
