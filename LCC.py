@@ -1,6 +1,6 @@
 import random
 import math
-from decimal import Decimal
+# from decimal import Decimal
 import time
 
 def isprime(n):
@@ -24,8 +24,8 @@ def initial(Z_lower=100):
             break
         else:
             q = q + 1
-    print("q = " + str(q))
-    print("\nq is prime\n")
+    # print("q = " + str(q))
+    # print("\nq is prime\n")
 
     # Find p and r
     r = 1
@@ -43,6 +43,8 @@ def initial(Z_lower=100):
     for i in range(0, p):
         if (math.gcd(i, p) == 1):
             Z_p_star.append(i)
+        # if len(Z_p_star) > 1:
+        #     break
 
     # print("Z_p* = ")
     # print(Z_p_star) # , len(Z_p_star) same length, i.e. range(p)
@@ -68,8 +70,8 @@ def initial(Z_lower=100):
 def generate_shares(N, T, K, secrets, p, q, r, g, alphas, betas):
     secrets_check = []
     for secret in secrets:
-        if secret==0: 
-            secrets_check.append(1) # one exception after quantization
+        if secret == 0:
+            secrets_check.append(1)  # "0": one exception after quantization
         else:
             secrets_check.append(secret)
     secrets = secrets_check
@@ -78,28 +80,32 @@ def generate_shares(N, T, K, secrets, p, q, r, g, alphas, betas):
 
     FIELD_SIZE = q
     noises = [random.randrange(0, FIELD_SIZE) for _ in range(T)]
-    
+
     shares = []
     for alpha in alphas:
-        # y = f(alpha, secrets, noises, betas, q)
         y = _lagrange_interpolate(alpha, betas, secrets + noises, q)
         shares.append((alpha, y))
 
     commitments = commitment(secrets + noises, g, p)
-    # print("commitments",commitments)
+    start = time.time()
+
     verifications = []
     for alpha in alphas:
         # check1 = g ** shares[i-1][1] % p
         # check1 = g ** share_ith(shares, i) % p
         check1 = quick_pow(g, share_ith(shares, alpha), p)
-        check2 = verification(commitments, alpha, betas, p)
+        check2 = verification(commitments, alpha, betas, p, q)
         verifications.append(check2)
-        if check1 == check2:
+        if (check1 % p) == (check2 % p):
             pass
         else:
             print("checking fails with:", check1, check2)
-    # print("verifications",verifications)
+            1/0
+        print(alpha, "-th user ============= tag at time ", time.time()-start,"seconds =============")
+        start = time.time()
+    # commitments, verifications = [0,], [0,]
     return shares, commitments, verifications
+
 
 def share_ith(shares, i):
     for share in shares:
@@ -107,108 +113,90 @@ def share_ith(shares, i):
             return share[1]
     return None
 
-def quick_pow(a, b, q):  # compute a^b mod q, in a faster way
+
+def quick_pow(a, b, q):  # compute a^b mod q, in a faster way？
     temp = 1
     for i in range(1, b + 1):
-        temp = temp * a % q
+        temp = (temp * a) % q
     return temp % q
+
 
 def commitment(paras, g, p):
     commitments = []
     for para in paras:
         # c = g ** coefficient_value % p
-        c = quick_pow(g,para,p)
+        c = quick_pow(g, para, p)
         commitments.append(c)
     return commitments
 
-def verification(commitments, alpha, betas, p):
-    v_pos, v_neg = 1,1
+
+def verification(commitments, alpha, betas, p, q):
+    # v_pos, v_neg = 1, 1
+    v = 1
     for i, c in enumerate(commitments):
         num, den = 1, 1
         for k, _ in enumerate(commitments):
             if k != i:
                 num *= alpha - betas[k]
                 den *= betas[i] - betas[k]
-            else:pass
-        if num/den > 0 :
-            v_pos = v_pos * c ** int(num/den) % p
-        else:
-            v_neg = v_neg  * c ** int(-num/den) % p
-    v = _divmod(v_pos, v_neg, p)
-    return v % p
+            else:
+                pass
+        # if num / den > 0:
+        #     v_pos = v_pos * quick_pow(c, int(num / den) % q, p) # c ** int(num / den) % p
+        # else:
+        #     v_neg = v_neg * quick_pow(c, int(- num / den) % q, p) # c ** int(-num / den) % p
 
+        # v = (v * quick_pow(c, int(num / den) % q, p)) % p
+        v = (v * quick_pow(c, _divmod(num, den, q) % q , p)) % p
+    # v = _divmod(v_pos, v_neg, p)
+    return v
 
-def f(x, secrets, zs, betas, q):
-    y = Decimal('0')
-    for i, s in enumerate(secrets):
-        beta_i = Decimal(str(betas[i]))
-        prod = Decimal('1')
-        for beta in betas:
-            if beta != int(beta_i):
-                prod *= (Decimal(str(x))-Decimal(str(beta)))/(beta_i-Decimal(str(beta)))
-            else:pass
-        y += Decimal(str(s)) * prod
-        y = Decimal(round(y)%q)
-    k = len(secrets)
-    for j, z in enumerate(zs):
-        beta_j = Decimal(str(betas[k + j]))
-        prod = Decimal('1')
-        for beta in betas:
-            if beta != int(beta_j):
-                prod *= (Decimal(str(x)) - Decimal(str(beta))) / (beta_j - Decimal(str(beta)))
-            else:pass
-        y += Decimal(str(z)) * prod 
-        y = Decimal(round(y)%q)
-    return int(y)
 
 def reconstruct_secret(pool, q, betas, K):
     out = []
-    x_s,y_s = [],[]
+    x_s, y_s = [], []
     for share in pool:
-        x_s.append(share[0])
-        y_s.append(share[1])
+        x_s.append(int(share[0]))
+        y_s.append(int(share[1]))
     for k in range(K):
         beta = betas[k]
         # out.append(f_rec(beta,pool,q))
         out.append(_lagrange_interpolate(beta, x_s, y_s, q))
     return out
 
-def f_rec(x, pool, q):
-    y = Decimal('0')
-    for i, s in enumerate(pool):
-        alpha_i, share_i = pool[i]
-        prod = Decimal('1')
-        for share in pool:
-            if share_i != share[1]:
-                prod *= (Decimal(str(x))-Decimal(str(share[0]))) / (Decimal(str(alpha_i))-Decimal(str(share[0])))
-            else:pass
-        y += Decimal(str(share_i)) * prod
-        y = Decimal(int(y)%q)
-    return int(y)
 
-def _lagrange_interpolate(x, x_s, y_s, p):
+def _lagrange_interpolate(x, x_s, y_s, q):
     """
     Find the y-value for the given x, given n (x, y) points;
     k points will define a polynomial of up to kth order.
     """
     k = len(x_s)
     assert k == len(set(x_s)), "points must be distinct"
+
     def PI(vals):  # upper-case PI -- product of inputs
         accum = 1
         for v in vals:
             accum *= v
         return accum
+
     nums = []  # avoid inexact division
     dens = []
+    L = 0
     for i in range(k):
         others = list(x_s)
         cur = others.pop(i)
         nums.append(PI(x - o for o in others))
         dens.append(PI(cur - o for o in others))
-    den = PI(dens)
-    num = sum([_divmod(nums[i] * den * y_s[i] % p, dens[i], p)
-               for i in range(k)])
-    return (_divmod(num, den, p) + p) % p
+
+        L += _divmod(y_s[i] * nums[i], dens[i], q) 
+    # den = PI(dens)
+    # num = sum([_divmod(nums[i] * den * y_s[i] % q, dens[i], q) for i in range(k)])
+
+    # L = sum( [_divmod(y_s[i] * nums[i], dens[i], q) for i in range(k)] )
+
+    return L % q
+    # return _divmod(num, den, q) % q
+
 
 def _extended_gcd(a, b):
     """
@@ -229,6 +217,7 @@ def _extended_gcd(a, b):
         y, last_y = last_y - quot * y, y
     return last_x, last_y
 
+
 def _divmod(num, den, p):
     """Compute num / den modulo prime p
 
@@ -243,11 +232,12 @@ if __name__ == '__main__':
     # initialization
     time_start = time.time()
     print("========Main LCC Starts==========")
-    p,q,r,g = initial(10**4)
+    p,q,r,g = initial(2* 10**4)
 
     # Secret taken from the group Z_q* 
-    T, N, K = 2, 10, 3
-    secrets = [0,378,787]
+    # T, N, K = 2, 10, 3
+    T, N, K = 7, 40, 15
+    secrets = [random.randint(2,q-1) for i in range(K)]
     print(f'Original Secret: {secrets}')
 
     # Phase I: Generation of shares
@@ -264,6 +254,7 @@ if __name__ == '__main__':
     print(f'Combining shares: {", ".join(str(share) for share in pool)}')
     secret_reconstructed = reconstruct_secret(pool, q, betas, K)
     print("reconstruct_secret:",secret_reconstructed)
+    print(f'Original Secret: {secrets}')
 
     time_end = time.time()
     print('time cost in second:', time_end-time_start)

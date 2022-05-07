@@ -1,6 +1,6 @@
 import random
 import math
-# from decimal import Decimal
+from decimal import Decimal
 import time
 
 def isprime(n):
@@ -233,7 +233,7 @@ if __name__ == '__main__':
     # initialization
     time_start = time.time()
     print("========Main VSS Starts==========")
-    p,q,r,g = initial(2**18) #   2 * 10**7)
+    p,q,r,g = initial(2*10**4) #   2 * 10**7)
 
     # Secret taken from the group Z_q* 
     t, n = 7, 40
@@ -244,7 +244,7 @@ if __name__ == '__main__':
     users = [i+1 for i in range(n)]
     # print(n, t, secret, p, q, r, g, users)
     shares, commitments, verifications= generate_shares(n, t, secret, p, q, r, g, users)
-    # print(f'Shares: {", ".join(str(share) for share in shares)}')
+    print(f'Shares: {", ".join(str(share) for share in shares)}')
     # print(f'Commitments: {", ".join(str(commitment) for commitment in commitments)}')
     # print(f'verifications: {", ".join(str(verification) for verification in verifications)}')
 
