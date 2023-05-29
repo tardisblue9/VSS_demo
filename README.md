@@ -10,3 +10,5 @@ Also, the initial prime should be of random choice over some large primes, inste
 Two more files are uploaded for full version of VSS and LCC. All operations are done in finite filed of q. Wiki yyds.
 
 Reed Solomon decoding added.
+
+A realization of SNIP is added (reference: Prio: Private, Robust, and Scalable Computation of Aggregate Statistics). SSS and VSS are added in this version of file. And a RS decoding algorithm is also added. 
